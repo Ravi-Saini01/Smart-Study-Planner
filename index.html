@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Study Planner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #4a90e2;
+      color: white;
+      text-align: center;
+      padding: 15px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .task-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .task-form input, .task-form textarea {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .task-form button {
+      padding: 10px 20px;
+      border: none;
+      background: #4a90e2;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .task {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .task.overdue { border-left: 6px solid red; }
+    .task.upcoming { border-left: 6px solid orange; }
+    .task.completed { border-left: 6px solid green; text-decoration: line-through; }
+
+    .task-actions button {
+      margin-left: 5px;
+      padding: 5px 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .task-actions .complete { background: #28a745; color: white; }
+    .task-actions .delete { background: #dc3545; color: white; }
+
+    .progress {
+      margin-top: 20px;
+    }
+
+    .progress-bar {
+      height: 20px;
+      background: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #4a90e2;
+      width: 0%;
+      text-align: center;
+      color: white;
+      line-height: 20px;
+      font-size: 12px;
+    }
+
+    /* Calendar styles */
+    .calendar {
+      margin-top: 30px;
+    }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+    }
+    .calendar-day {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 8px;
+      min-height: 80px;
+      position: relative;
+      background: #fafafa;
+    }
+    .calendar-day span {
+      font-weight: bold;
+    }
+    .calendar-task {
+      background: #4a90e2;
+      color: white;
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      display: block;
+      margin-top: 3px;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+
+  <header>📚 Smart Study Planner</header>
+
+  <div class="container">
+    <form class="task-form" id="taskForm">
+      <input type="text" id="title" placeholder="Study Task" required>
+      <textarea id="desc" placeholder="Description"></textarea>
+      <input type="date" id="deadline" required>
+      <button type="submit">Add Task</button>
+    </form>
+
+    <div class="progress">
+      <h3>Progress</h3>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill">0%</div>
+      </div>
+    </div>
+
+    <h3>Tasks</h3>
+    <div class="task-list" id="taskList"></div>
+
+    <div class="calendar">
+      <div class="calendar-header">
+        <button id="prevMonth">⬅</button>
+        <h3 id="calendarMonth"></h3>
+        <button id="nextMonth">➡</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    const taskForm = document.getElementById("taskForm");
+    const taskList = document.getElementById("taskList");
+    const progressFill = document.getElementById("progressFill");
+    const calendarMonth = document.getElementById("calendarMonth");
+    const calendarGrid = document.getElementById("calendarGrid");
+    const prevMonthBtn = document.getElementById("prevMonth");
+    const nextMonthBtn = document.getElementById("nextMonth");
+
+    let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+    let currentDate = new Date();
+
+    function saveTasks() {
+      localStorage.setItem("tasks", JSON.stringify(tasks));
+      renderTasks();
+      renderCalendar();
+    }
+
+    function renderTasks() {
+      taskList.innerHTML = "";
+      const today = new Date().toISOString().split("T")[0];
+      let completedCount = 0;
+
+      tasks.forEach((task, index) => {
+        const taskDiv = document.createElement("div");
+        taskDiv.classList.add("task");
+
+        if (task.completed) {
+          taskDiv.classList.add("completed");
+          completedCount++;
+        } else if (task.deadline < today) {
+          taskDiv.classList.add("overdue");
+        } else if (task.deadline === today) {
+          taskDiv.classList.add("upcoming");
+        }
+
+        taskDiv.innerHTML = `
+          <div>
+            <strong>${task.title}</strong> <br>
+            <small>${task.desc || ""}</small> <br>
+            <small>Deadline: ${task.deadline}</small>
+          </div>
+          <div class="task-actions">
+            <button class="complete">${task.completed ? "Undo" : "Complete"}</button>
+            <button class="delete">Delete</button>
+          </div>
+        `;
+
+        taskDiv.querySelector(".complete").addEventListener("click", () => {
+          tasks[index].completed = !tasks[index].completed;
+          saveTasks();
+        });
+
+        taskDiv.querySelector(".delete").addEventListener("click", () => {
+          tasks.splice(index, 1);
+          saveTasks();
+        });
+
+        taskList.appendChild(taskDiv);
+      });
+
+      const progress = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
+      progressFill.style.width = progress + "%";
+      progressFill.textContent = progress + "%";
+    }
+
+    function renderCalendar() {
+      calendarGrid.innerHTML = "";
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      calendarMonth.textContent = currentDate.toLocaleDateString("default", { month: "long", year: "numeric" });
+
+      // Fill empty slots before the first day
+      for (let i = 0; i < firstDay; i++) {
+        const emptyDiv = document.createElement("div");
+        calendarGrid.appendChild(emptyDiv);
+      }
+
+      // Fill days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const dayDiv = document.createElement("div");
+        dayDiv.classList.add("calendar-day");
+        dayDiv.innerHTML = `<span>${day}</span>`;
+
+        tasks.forEach(task => {
+          if (task.deadline === dateStr) {
+            const taskLabel = document.createElement("div");
+            taskLabel.classList.add("calendar-task");
+            taskLabel.textContent = task.title;
+            dayDiv.appendChild(taskLabel);
+          }
+        });
+
+        calendarGrid.appendChild(dayDiv);
+      }
+    }
+
+    taskForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const title = document.getElementById("title").value;
+      const desc = document.getElementById("desc").value;
+      const deadline = document.getElementById("deadline").value;
+
+      tasks.push({ title, desc, deadline, completed: false });
+      saveTasks();
+
+      taskForm.reset();
+    });
+
+    prevMonthBtn.addEventListener("click", () => {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+      renderCalendar();
+    });
+
+    nextMonthBtn.addEventListener("click", () => {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      renderCalendar();
+    });
+
+    renderTasks();
+    renderCalendar();
+  </script>
+
+</body>
+</html>
